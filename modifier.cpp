@@ -66,11 +66,10 @@ HANDLE AttachToProcess(DWORD ProcessId, bool killonexit)
 	int err = 0;
 	PHANDLE TokenHandle;
 
-	if(!(err = DebugActiveProcess(ProcessId)))
-	{
-		cerr << "Could not attach to process, exiting" << endl;
-		
-	}
+//	if(!(err = DebugActiveProcess(ProcessId)))
+	//{
+	//	cerr << "Could not attach to process, exiting" << endl;	
+	//}
 
 	if(!iGetDebugPrivilege())
 	{
@@ -83,10 +82,10 @@ HANDLE AttachToProcess(DWORD ProcessId, bool killonexit)
 		cout << "Cannot OpenProcess" << endl;
 	}
 	
-	if(!(err = DebugSetProcessKillOnExit(killonexit)))
-	{
-		cerr << "Failed to set debug to not kill process on exit, process will die when this program exits" << endl;
-	}
+//	if(!(err = DebugSetProcessKillOnExit(killonexit)))
+//	{
+//		cerr << "Failed to set debug to not kill process on exit, process will die when this program exits" << endl;
+//	}
 
 	return hProcess;
 }

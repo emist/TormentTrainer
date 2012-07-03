@@ -9,8 +9,6 @@ void change_xp(HANDLE proc, string offset)
 {
 	long address = (DWORD)str2dword(hexadd(offset, "19"));
 
-	SIZE_T writen = 0;
-
 	struct opcode * ops = new opcode[4];
 
 	ops[0].payload[0] = 0x01; //add edx, eax
@@ -55,14 +53,107 @@ void change_xp(HANDLE proc, string offset)
 	delete ops;
 }
 
+void unlimited_points(HANDLE proc, string offset)
+{
+	long address = (DWORD)str2dword(hexadd(offset, "215BDE"));
+
+	struct opcode * ops = new opcode[0];
+
+	//noping sub edx, 01
+	ops[0].payload[0] = 0x90; 
+	ops[0].payload[1] = 0x90;
+	ops[0].payload[2] = 0x90;
+	ops[0].size = 3;
+
+	patch(proc, ops, 1, (unsigned long *)address);
+}
+
+void revert_unlimited_points(HANDLE proc, string offset)
+{
+	long address = (DWORD)str2dword(hexadd(offset, "215BDE"));
+
+	struct opcode * ops = new opcode[0];
+
+	//sub edx, 01
+	ops[0].payload[0] = 0x83; 
+	ops[0].payload[1] = 0xEA;
+	ops[0].payload[2] = 0x01;
+	ops[0].size = 3;
+
+	patch(proc, ops, 1, (unsigned long *)address);
+}
+
+void set_maxhp(HANDLE proc, string offset)
+{
+	long address = (DWORD)str2dword(hexadd(offset, "44CAD"));
+
+	struct opcode * ops = new opcode[0];
+
+	//sub edx, 01
+	ops[0].payload[0] = 0x66; 
+	ops[0].payload[1] = 0xB8;
+	ops[0].payload[2] = 0x99;
+	ops[0].payload[3] = 0x79;
+	ops[0].size = 4;
+
+	patch(proc, ops, 1, (unsigned long *)address);
+}
+
+void maxregen(HANDLE proc, string offset)
+{
+	long address = (DWORD)str2dword(hexadd(offset, "B8305"));
+
+	struct opcode * ops = new opcode[0];
+
+	//add cx, 79
+	ops[0].payload[0] = 0x66; 
+	ops[0].payload[1] = 0x83;
+	ops[0].payload[2] = 0xC1;
+	ops[0].payload[3] = 0x79;
+	ops[0].size = 4;
+
+	patch(proc, ops, 1, (unsigned long *)address);
+}
+
+void revert_maxregen(HANDLE proc, string offset)
+{
+	long address = (DWORD)str2dword(hexadd(offset, "B8305"));
+
+	struct opcode * ops = new opcode[0];
+
+	//add cx, [eax+08]
+	ops[0].payload[0] = 0x66; 
+	ops[0].payload[1] = 0x03;
+	ops[0].payload[2] = 0x48;
+	ops[0].payload[3] = 0x08;
+	ops[0].size = 4;
+
+	patch(proc, ops, 1, (unsigned long *)address);
+}
+
+void reverse_maxhp(HANDLE proc, string offset)
+{
+	long address = (DWORD)str2dword(hexadd(offset, "44CAD"));
+
+	struct opcode * ops = new opcode[0];
+
+	//sub edx, 01
+	ops[0].payload[0] = 0x66; 
+	ops[0].payload[1] = 0x8B;
+	ops[0].payload[2] = 0x45;
+	ops[0].payload[3] = 0xF8;
+	ops[0].size = 4;
+
+	patch(proc, ops, 1, (unsigned long *)address);
+}
+
+
 void revert_xp(HANDLE proc, string offset)
 {
 	//0x03D0
 	//0x8B45D8
 	
 	long address = (DWORD)str2dword(hexadd(offset, "C55E2"));
-
-	SIZE_T writen = 0;
 
 	struct opcode * ops = new opcode[2];
 
@@ -117,6 +208,30 @@ int main ( int argc, char *argv[] )
 	else if(argumentval.compare("-xp=off") == 0)
 	{
 		revert_xp(proc, offset);
+	}
+	else if(argumentval.compare("-points=on") == 0)
+	{
+		unlimited_points(proc, offset);
+	}
+	else if(argumentval.compare("-points=off") == 0)
+	{
+		revert_unlimited_points(proc, offset);
+	}
+	else if(argumentval.compare("-maxhp=on") == 0)
+	{
+		set_maxhp(proc, offset);
+	}
+	else if(argumentval.compare("-maxhp=off") == 0)
+	{
+		reverse_maxhp(proc, offset);
+	}
+	else if(argumentval.compare("-maxregen=on") == 0)
+	{
+		maxregen(proc, offset);
+	}
+	else if(argumentval.compare("-maxregen=off") == 0)
+	{
+		revert_maxregen(proc, offset);
 	}
 	else
 	{
