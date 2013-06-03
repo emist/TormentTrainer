@@ -1,10 +1,21 @@
 //Credits to:
 //http://www.daniweb.com/software-development/cpp/code/217330/hex-addition
 
-
 #include "hexoperations.h"
+#include "Logger.h"
+using namespace MemUtil;
 
-DWORD str2dword(string address)
+BYTE HexOperations::str2byte(string byte)
+{
+	stringstream ss;
+	int end_byte = 0;
+	ss << std::hex << byte;
+	ss >> end_byte;
+	//Logger::Logit("HexOperations::str2byte", "Byte=" + std::to_string(static_cast<long long>(end_byte)));
+	return end_byte;
+}
+
+DWORD HexOperations::str2dword(string address)
 {
 	stringstream ss;
 	long addr;
@@ -14,13 +25,13 @@ DWORD str2dword(string address)
 }
 
 //credits http://www.codeproject.com/Articles/4804/Basic-concepts-on-Endianness
-void endian_swap_long(unsigned long & nLongNumber)
+void HexOperations::endian_swap_long(unsigned long & nLongNumber)
 {
    nLongNumber = (((nLongNumber&0x000000FF)<<24)+((nLongNumber&0x0000FF00)<<8)+
    ((nLongNumber&0x00FF0000)>>8)+((nLongNumber&0xFF000000)>>24));
 }
 
-void endian_swap(unsigned long long& x)
+void HexOperations::endian_swap(unsigned long long& x)
 {
     x = (x>>56) | 
         ((x<<40) & 0x00FF000000000000) |
@@ -32,7 +43,7 @@ void endian_swap(unsigned long long& x)
         (x<<56);
 }
 
-string hexdecadd(const string & hex1, const string & dec1)
+string HexOperations::hexdecadd(const string & hex1, const string & dec1)
 {
 	long n1, n2;
 	n1 = hex2dec(hex1);
@@ -40,7 +51,7 @@ string hexdecadd(const string & hex1, const string & dec1)
 	return dec2hex(n1+n2);
 }
 
-string hexdecsubstract(const string & hex1, const string & dec1)
+string HexOperations::hexdecsubstract(const string & hex1, const string & dec1)
 {
 	long n1, n2;
 	n1 = hex2dec(hex1);
@@ -50,7 +61,7 @@ string hexdecsubstract(const string & hex1, const string & dec1)
 
 
 
-string hexadd(const string & hex1, const string & hex2)
+string HexOperations::hexadd(const string & hex1, const string & hex2)
 {
 	long n1, n2;
 	n1 = hex2dec(hex1);
@@ -58,7 +69,7 @@ string hexadd(const string & hex1, const string & hex2)
 	return dec2hex(n1+n2);
 }
 
-string hexsubstract(const string & hex1, const string & hex2)
+string HexOperations::hexsubstract(const string & hex1, const string & hex2)
 {
 	long n1, n2;
 	n1 = hex2dec(hex1);
@@ -66,7 +77,7 @@ string hexsubstract(const string & hex1, const string & hex2)
 	return dec2hex(n1-n2);
 }
 
-long str2dec(string dec)
+long HexOperations::str2dec(string dec)
 {
 	stringstream ss;
 	long s;
@@ -75,7 +86,7 @@ long str2dec(string dec)
 	return s;
 }
 
-string dec2hex(long i)
+string HexOperations::dec2hex(long i)
 {
 	stringstream ss;
 	string s;
@@ -86,7 +97,7 @@ string dec2hex(long i)
 	return s;
 }
 
-long hex2dec(const string & hexstr)
+long HexOperations::hex2dec(const string & hexstr)
 {
 	stringstream ss;
 	long i = 0;

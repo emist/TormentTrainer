@@ -1,17 +1,20 @@
-#include "modifier.h"
+#include "Modifier.h"
 #include "hexoperations.h"
+#include "Logger.h"
+#include "Payload.h"
 
 using namespace std;
+using namespace MemUtil;
 
-BOOL SetPrivilege(HANDLE hToken,LPCTSTR lpszPrivilege,BOOL bEnablePrivilege) 
+BOOL MemoryUtility::SetPrivilege(HANDLE hToken,LPCTSTR lpszPrivilege,BOOL bEnablePrivilege) 
 {
         TOKEN_PRIVILEGES tp;
         LUID luid;
 
         if ( !LookupPrivilegeValue(NULL,lpszPrivilege,&luid ) )// receives LUID of privilege
         {
-                printf("LookupPrivilegeValue error: %u\n", GetLastError() ); 
-                return FALSE; 
+			printf("LookupPrivilegeValue error: %u\n", GetLastError() ); 
+            return FALSE; 
         }
 
         tp.PrivilegeCount = 1;
@@ -25,20 +28,20 @@ BOOL SetPrivilege(HANDLE hToken,LPCTSTR lpszPrivilege,BOOL bEnablePrivilege)
 
         if (!AdjustTokenPrivileges(hToken,FALSE,&tp,sizeof(TOKEN_PRIVILEGES),(PTOKEN_PRIVILEGES) NULL,(PDWORD) NULL) )
         { 
-                printf("AdjustTokenPrivileges error: %u\n", GetLastError() ); 
-                return FALSE; 
+			printf("AdjustTokenPrivileges error: %u\n", GetLastError() ); 
+            return FALSE; 
         } 
 
         if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
         {
-                printf("The token does not have the specified privilege. \n");
-                return FALSE;
+			printf("The token does not have the specified privilege. \n");
+			return FALSE;
         } 
 
         return TRUE;
 }
 
-int iGetDebugPrivilege ( void ) 
+int MemoryUtility::iGetDebugPrivilege ( void ) 
 {     
 	HANDLE hToken;
 	TOKEN_PRIVILEGES CurrentTPriv;
@@ -61,54 +64,74 @@ int iGetDebugPrivilege ( void )
 	return iRet; 
 }
 
-HANDLE AttachToProcess(DWORD ProcessId, bool killonexit)
+HANDLE MemoryUtility::AttachToProcess(DWORD ProcessId, bool killonexit)
 {
 	int err = 0;
-	PHANDLE TokenHandle;
-
-//	if(!(err = DebugActiveProcess(ProcessId)))
-	//{
-	//	cerr << "Could not attach to process, exiting" << endl;	
-	//}
 
 	if(!iGetDebugPrivilege())
 	{
-		cout << "Failed to set debug privileges" << endl;
+		Logger::Logit("MemoryUtility::AttachToProcess", "Failed to set debug privileges");
 	}
 	
 	HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_CREATE_THREAD, FALSE, ProcessId);
 	if(hProcess == NULL)
 	{
-		cout << "Cannot OpenProcess" << endl;
+		Logger::Logit("MemoryUtility::AttachToProcess", "Cannot open process");
 	}
 	
-//	if(!(err = DebugSetProcessKillOnExit(killonexit)))
-//	{
-//		cerr << "Failed to set debug to not kill process on exit, process will die when this program exits" << endl;
-//	}
-
 	return hProcess;
 }
 
-LPVOID ReadMemory(HANDLE proc, DWORD address,SIZE_T size, SIZE_T * bytesRead)
+LPVOID MemoryUtility::ReadMemory(HANDLE proc, DWORD address,SIZE_T size, SIZE_T * bytesRead)
 {
 	BYTE * buf = new BYTE[size];
 
-	for(int i = 0; i < size; i++)
+	for(unsigned int i = 0; i < size; i++)
 	{
-		cout <<" READMEM ADDRESS" << hex << (address+i) << endl;
 		BOOL couldread = ReadProcessMemory(proc, (void*) (address+i), &buf[i], 1, bytesRead);
-		//printf("%x\n", buf[i]);
+
 		if(!couldread)
 		{
-			cout << "Error Reading Memory" << endl;
+			Logger::Logit("MemoryUtility::ReadMemory", "Error reading memory");
 		}
 	}
 
 	return buf;
 }
 
-BOOL WriteOpcode(HANDLE proc, struct opcode op, unsigned long * address)
+BOOL MemoryUtility::WritePaySegment(HANDLE proc, map<DWORD, vector<Payload>> paysegment)
+{
+	int ret = 0;
+	for(map<DWORD, vector<Payload>>::iterator iter = paysegment.begin(); iter != paysegment.end(); iter++)
+	{
+		DWORD addr = iter->first;
+		stringstream ss;
+		string addrstr;
+		vector<Payload> payload(iter->second);
+		Logger::Logit("MemoryUtility::WritePaySegment", "Writting Segment");
+		for(vector<Payload>::iterator pay_iter = payload.begin(); pay_iter != payload.end(); pay_iter++)
+		{
+			for(unsigned int i = 0; i < pay_iter->pay.size(); i++)
+			{
+				ret = MemoryUtility::WriteMemory(proc, (LPVOID)addr, &pay_iter->pay[i], 1, NULL);
+				ss.clear();
+				ss << hex << iter->first;
+				ss >> hex >> addrstr;
+				if(ret != 1)
+				{
+					Logger::Logit("MemoryUtility::WritePaySegment", "Error Writting Byte");
+					return ret;
+				}
+				ss.clear();	
+
+				addr = HexOperations::str2dword(HexOperations::hexdecadd(addrstr, "1"));
+			}
+		}
+	}
+	return ret;
+}
+
+BOOL MemoryUtility::WritePayload(HANDLE proc, Payload payload, DWORD address)
 {
 	stringstream ss;
 	string addrstr;
@@ -117,22 +140,34 @@ BOOL WriteOpcode(HANDLE proc, struct opcode op, unsigned long * address)
 	unsigned long addr = 0;
 	addr = (unsigned long) address;
 	
-	for(int i = 0; i < op.size; i++)
+	Logger::Logit("MemoryUtility::WriteOpcode", "Address=" + std::to_string(static_cast<long long>(addr)));
+	Logger::Logit("MemoryUtility::WriteOpcode", "payload size=" + std::to_string(static_cast<long long>(payload.pay.size())));
+	for(unsigned int i = 0; i < payload.pay.size(); i++)
 	{
-		ret = WriteMemory(proc, (LPVOID)addr, &op.payload[i], 1, NULL);
-		
+		ret = MemoryUtility::WriteMemory(proc, (LPVOID)addr, &payload.pay[i], 1, NULL);
 		ss.clear();
 		ss << hex << addr;
 		ss >> hex >> addrstr;
-		
+		if(ret != 1)
+		{
+			Logger::Logit("MemoryUtility::WriteOpcode", "Error Writting Byte");
+			return ret;
+		}
 		ss.clear();	
 
-		addr = str2dword(hexdecadd(addrstr, "1"));
+		addr = HexOperations::str2dword(HexOperations::hexdecadd(addrstr, "1"));
 	}
+
 	return ret;
 }
 
-BOOL patch(HANDLE proc, struct opcode op[], int bufflen, unsigned long * address)
+BOOL MemoryUtility::Patch(HANDLE proc, map<DWORD, vector<Payload>> paysegment)
+{
+	Logger::Logit("MemoryUtility::Patch", "Paysegment size=" + std::to_string(static_cast<long long>(paysegment.size())));
+	return WritePaySegment(proc, paysegment);
+}
+
+BOOL MemoryUtility::Patch(HANDLE proc, vector<Payload> payloads, DWORD address)
 {
 	unsigned long value = 0;
 	unsigned long addr = 0;
@@ -141,12 +176,14 @@ BOOL patch(HANDLE proc, struct opcode op[], int bufflen, unsigned long * address
 	string hextest;
 	string dectest;
 	addr = (unsigned long)address;
-	for(int i = 0; i < bufflen; i++)
+	for(unsigned int i = 0; i < payloads.size() ; i++)
 	{
-		unsigned long val = 0xc201;
 
-		WriteOpcode(proc, op[i], (unsigned long *)addr);
-		offset+=op[i].size;
+		Logger::Logit("MemoryUtility::Patch", "Payloads size=" + std::to_string(static_cast<long long>(payloads.size())));
+		Logger::Logit("MemoryUtility::Patch", "pay size=" + std::to_string(static_cast<long long>(payloads[i].pay.size())));
+		Logger::Logit("MemoryUtility::Patch", "Address=" + std::to_string(static_cast<long long>(address)));
+		WritePayload(proc,payloads[i], addr);
+		offset+=payloads[i].pay.size();
 
 		ss.clear();
 		ss << address;
@@ -155,12 +192,12 @@ BOOL patch(HANDLE proc, struct opcode op[], int bufflen, unsigned long * address
 		ss << offset;
 		ss >> dectest;
 
-		addr = str2dword(hexdecadd(hextest, dectest));
+		addr = HexOperations::str2dword(HexOperations::hexdecadd(hextest, dectest));
 	}
 	return true;
 }
 
-BOOL WriteMemory(HANDLE proc, LPVOID address, LPCVOID buffer, SIZE_T size, SIZE_T * byteswritten)
+BOOL MemoryUtility::WriteMemory(HANDLE proc, LPVOID address, LPCVOID buffer, SIZE_T size, SIZE_T * byteswritten)
 {
 	BOOL wrote = false;
 	unsigned long hold = NULL;
@@ -168,9 +205,10 @@ BOOL WriteMemory(HANDLE proc, LPVOID address, LPCVOID buffer, SIZE_T size, SIZE_
     VirtualProtectEx(proc,(void*)address,size, PAGE_EXECUTE_READWRITE, &hold);
 	if(!(wrote = WriteProcessMemory(proc, address, buffer, size, byteswritten)))
 	{
-		cout << "Memory Write Failed" << endl;
+		Logger::Logit("MemoryUtility::WriteMemory", "Memory Write Failed");
 		cout << GetLastError() << endl;
 	}
+
 	VirtualProtectEx(proc,(void*)address, size, hold, NULL);
 
 	return wrote;
@@ -190,7 +228,7 @@ unsigned long ReadMemory(HANDLE proc, DWORD address,SIZE_T size, SIZE_T * bytesR
 }
 */
 
-DWORD GetModuleBase(LPCSTR lpModuleName, DWORD dwProcessId)
+DWORD MemoryUtility::GetModuleBase(LPCSTR lpModuleName, DWORD dwProcessId)
 {
 	MODULEENTRY32 lpModuleEntry = {0}; 
 
@@ -220,7 +258,7 @@ DWORD GetModuleBase(LPCSTR lpModuleName, DWORD dwProcessId)
 	return NULL; 
 }
 
-DWORD FindProcessId(std::string processName)
+DWORD MemoryUtility::FindProcessId(std::string processName)
 {
 	PROCESSENTRY32 processInfo;
 	processInfo.dwSize = sizeof(processInfo);
